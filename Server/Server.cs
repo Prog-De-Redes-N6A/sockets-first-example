@@ -1,6 +1,7 @@
 ﻿using System.Net.Sockets;
 using System.Net;
 using System.Text;
+using Common;
 
 namespace Server
 {
@@ -36,17 +37,33 @@ namespace Server
 
         static void HandleClient(Socket clientSocket)
         {
-            while (true) // Mala practica
+            bool clientActive = true;
+            NetworkDataHelper networkDataHelper = new NetworkDataHelper(clientSocket);
+            while (clientActive) // Mala practica
             {
-                byte[] messageLengthBuffer = new byte[2];
-                clientSocket.Receive(messageLengthBuffer);
-                ushort messageLength = BitConverter.ToUInt16(messageLengthBuffer);
+                try
+                {
+                    byte[] messageLengthBuffer = networkDataHelper.Receive(2);
+                    ushort messageLength = BitConverter.ToUInt16(messageLengthBuffer);
 
-                byte[] buffer = new byte[messageLength];
-                clientSocket.Receive(buffer);
-                string message = Encoding.UTF8.GetString(buffer);
-                Console.WriteLine($"Client sent: {message}");
+                    byte[] buffer = networkDataHelper.Receive(messageLength);
+
+                    string message = Encoding.UTF8.GetString(buffer);
+                    Console.WriteLine($"Client sent: {message}");
+                }
+                catch (SocketException e)
+                {
+                    clientActive = false;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Client send badly formatted data");
+                    clientActive = false;
+                }
             }
+            Console.WriteLine("Client disconnected");
+            clientSocket.Shutdown(SocketShutdown.Both);
+            clientSocket.Close();
         }
     }
 }

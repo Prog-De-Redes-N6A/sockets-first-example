@@ -1,6 +1,7 @@
 ﻿using System.Net.Sockets;
 using System.Net;
 using System.Text;
+using Common;
 
 namespace Cliente
 {
@@ -25,21 +26,41 @@ namespace Cliente
             
             Console.WriteLine("Connected to server!!");
 
-            while (true)
+            bool clientRunning = true;
+            NetworkDataHelper networkDataHelper = new NetworkDataHelper(clientSocket);
+
+            while (clientRunning)
             {
                 Console.WriteLine("Type a message for the server:");
                 string message = Console.ReadLine();
+                if (message == "exit")
+                {
+                    clientRunning = false;
+                    break;
+                }
                 byte[] messageBytes = Encoding.UTF8.GetBytes(message);
 
                 ushort messageLength = (ushort)messageBytes.Length;
                 byte[] messageLengthBytes = BitConverter.GetBytes(messageLength);
 
-                clientSocket.Send(messageLengthBytes);
+                try
+                {
+                    networkDataHelper.Send(messageLengthBytes);
 
-                clientSocket.Send(messageBytes);
+                    networkDataHelper.Send(messageBytes);
 
-                Console.WriteLine("Sent message...");
+                    Console.WriteLine("Sent message...");
+                }
+                catch (SocketException e)
+                {
+                    Console.WriteLine("Connection interrupted");
+                    clientRunning = false;
+                }
             }
+
+            Console.WriteLine("Closing connection...");
+            clientSocket.Shutdown(SocketShutdown.Both);
+            clientSocket.Close();
         }
     }
 }
