@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Cliente
 {
-    internal class Program
+    internal class Client
     {
         static void Main(string[] args)
         {
@@ -16,7 +16,7 @@ namespace Cliente
                 ProtocolType.Tcp
             );
 
-            IPEndPoint localEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8000);
+            IPEndPoint localEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 0);
             clientSocket.Bind(localEndpoint);
 
             IPEndPoint serverEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 5000);
@@ -25,12 +25,21 @@ namespace Cliente
             
             Console.WriteLine("Connected to server!!");
 
-            Console.WriteLine("Type a message for the server:");
-            string message = Console.ReadLine();
-            byte[] messageBytes = Encoding.ASCII.GetBytes(message);
-            clientSocket.Send(messageBytes);
-            Console.WriteLine("Sent message...");
-            Console.ReadLine();
+            while (true)
+            {
+                Console.WriteLine("Type a message for the server:");
+                string message = Console.ReadLine();
+                byte[] messageBytes = Encoding.UTF8.GetBytes(message);
+
+                ushort messageLength = (ushort)messageBytes.Length;
+                byte[] messageLengthBytes = BitConverter.GetBytes(messageLength);
+
+                clientSocket.Send(messageLengthBytes);
+
+                clientSocket.Send(messageBytes);
+
+                Console.WriteLine("Sent message...");
+            }
         }
     }
 }
