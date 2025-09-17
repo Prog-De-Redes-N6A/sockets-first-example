@@ -43,13 +43,44 @@ namespace Server
             {
                 try
                 {
-                    byte[] messageLengthBuffer = networkDataHelper.Receive(2);
-                    ushort messageLength = BitConverter.ToUInt16(messageLengthBuffer);
+                    byte[] fileNameLengthBuffer = networkDataHelper.Receive(Protocol.FileNameLengthSize);
+                    int fileNameLength = BitConverter.ToInt32(fileNameLengthBuffer);
 
-                    byte[] buffer = networkDataHelper.Receive(messageLength);
+                    byte[] fileNameBytes = networkDataHelper.Receive(fileNameLength);
+                    string fileName = Encoding.UTF8.GetString(fileNameBytes);
 
-                    string message = Encoding.UTF8.GetString(buffer);
-                    Console.WriteLine($"Client sent: {message}");
+                    byte[] fileSizeBuffer = networkDataHelper.Receive(Protocol.FileLengthSize);
+                    long fileSize = BitConverter.ToInt64(fileSizeBuffer);
+
+                    long offset = 0; // bytes received
+                    long partCount = Protocol.CalculateFileParts(fileSize);
+                    long currentPart = 1;
+
+                    FileStreamHelper fsh = new FileStreamHelper();
+
+                    while (offset < fileSize)
+                    {
+                        byte[] buffer;
+                        bool isLastPart = (currentPart == partCount);
+
+                        if (!isLastPart)
+                        {
+                            Console.WriteLine($"Receiving segment #{currentPart} of size {Protocol.MaxFilePartSize}");
+                            buffer = networkDataHelper.Receive(Protocol.MaxFilePartSize);
+                            offset += Protocol.MaxFilePartSize;
+                        }
+                        else
+                        {
+                            long lastPartSize = fileSize - offset;
+                            Console.WriteLine($"Receiving segment #{currentPart} of size {lastPartSize}");
+                            buffer = networkDataHelper.Receive((int)lastPartSize);
+                            offset += lastPartSize;
+                        }
+                        fsh.Write(fileName, buffer);
+                        currentPart++;
+                    }
+
+                    Console.WriteLine($"Received message");
                 }
                 catch (SocketException e)
                 {

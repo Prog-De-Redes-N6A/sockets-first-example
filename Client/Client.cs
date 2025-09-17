@@ -31,25 +31,58 @@ namespace Cliente
 
             while (clientRunning)
             {
-                Console.WriteLine("Type a message for the server:");
-                string message = Console.ReadLine();
-                if (message == "exit")
-                {
-                    clientRunning = false;
-                    break;
-                }
-                byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-
-                ushort messageLength = (ushort)messageBytes.Length;
-                byte[] messageLengthBytes = BitConverter.GetBytes(messageLength);
-
                 try
                 {
-                    networkDataHelper.Send(messageLengthBytes);
+                    Console.WriteLine("Type the path of file:");
+                    string filePath = Console.ReadLine();
+                    //if (message == "exit")
+                    //{
+                    //    clientRunning = false;
+                    //    break;
+                    //}
+                    FileInfo fileInfo = new FileInfo(filePath);
+                    string fileName = fileInfo.Name;
+                    byte[] fileNameBytes = Encoding.UTF8.GetBytes(fileName);
+                    int fileNameLength = fileNameBytes.Length;
+                    byte[] fileNameLengthBytes = BitConverter.GetBytes(fileNameLength);
 
-                    networkDataHelper.Send(messageBytes);
+                    networkDataHelper.Send(fileNameLengthBytes);
 
-                    Console.WriteLine("Sent message...");
+                    networkDataHelper.Send(fileNameBytes);
+
+                    long fileSize = fileInfo.Length;
+                    byte[] fileSizeBytes = BitConverter.GetBytes(fileSize);
+                    networkDataHelper.Send(fileSizeBytes);
+
+                    long offset = 0; // bytes sent
+                    long partCount = Protocol.CalculateFileParts(fileSize);
+                    long currentPart = 1;
+
+                    FileStreamHelper fsh = new FileStreamHelper();
+
+                    while (offset < fileSize)
+                    {
+                        byte[] buffer;
+                        bool isLastPart = (currentPart == partCount);
+
+                        if (!isLastPart)
+                        {
+                            Console.WriteLine($"Sending segment #{currentPart} of size {Protocol.MaxFilePartSize}");
+                            buffer = fsh.Read(filePath, offset, Protocol.MaxFilePartSize);
+                            offset += Protocol.MaxFilePartSize;
+                        }
+                        else
+                        {
+                            long lastPartSize = fileSize - offset;
+                            Console.WriteLine($"Sending segment #{currentPart} of size {lastPartSize}");
+                            buffer = fsh.Read(filePath, offset, (int)lastPartSize);
+                            offset += lastPartSize;
+                        }
+                        networkDataHelper.Send(buffer);
+                        currentPart++;
+                    }
+
+                    Console.WriteLine("Sent file...");
                 }
                 catch (SocketException e)
                 {
