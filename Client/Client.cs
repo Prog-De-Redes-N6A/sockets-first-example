@@ -113,7 +113,7 @@ namespace Cliente
 
         internal static bool Register(NetworkDataHelper networkDataHelper)
         {
-            Console.Write("Username:");
+            Console.Write("Username: ");
             string? userName = Console.ReadLine();
             if (userName == null)
             {
@@ -121,7 +121,7 @@ namespace Cliente
                 return true;
             }
 
-            Console.Write("Password:");
+            Console.Write("Password: ");
             string? pass = Console.ReadLine();
             if (pass == null)
             {
@@ -161,7 +161,7 @@ namespace Cliente
 
         internal static bool LogIn(NetworkDataHelper networkDataHelper)
         {
-            Console.Write("Username:");
+            Console.Write("Username: ");
             string? userName = Console.ReadLine();
             if (userName == null)
             {
@@ -169,7 +169,7 @@ namespace Cliente
                 return true;
             }
 
-            Console.Write("Password:");
+            Console.Write("Password: ");
             string? pass = Console.ReadLine();
             if (pass == null)
             {
@@ -211,7 +211,7 @@ namespace Cliente
         {
             try
             {
-                Console.WriteLine("Type the path of file:");
+                Console.Write("Type the path of file: ");
                 string? filePath = Console.ReadLine();
                 if (filePath == null)
                 {

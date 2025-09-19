@@ -44,13 +44,14 @@ namespace Server
                 {
                     currentClients++;
                 }
-                Thread t = new Thread(() => HandleClient(clientSocket));
+                int clientNum = currentClients;
+                Thread t = new Thread(() => HandleClient(clientSocket, clientNum));
                 t.Start();
             }
             serverSocket.Close();
         }
 
-        static void HandleClient(Socket clientSocket)
+        static void HandleClient(Socket clientSocket, int clientNum)
         {
             bool clientActive = true;
             NetworkDataHelper networkDataHelper = new NetworkDataHelper(clientSocket);
@@ -89,11 +90,11 @@ namespace Server
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Client sent badly formatted data");
+                    Console.WriteLine($"Client {clientNum} sent badly formatted data");
                     clientActive = false;
                 }
             }
-            Console.WriteLine("Client disconnected");
+            Console.WriteLine($"Client {clientNum} disconnected");
             clientSocket.Shutdown(SocketShutdown.Both);
             clientSocket.Close();
             lock (clientThreadsLock)
@@ -188,14 +189,13 @@ namespace Server
                     fsh.Write(fileName, buffer);
                     currentPart++;
                 }
+                Console.WriteLine($"Received file {fileName}");
             }
             catch (SocketException ex)
             {
                 File.Delete(fileName);
                 throw new SocketException();
             }
-
-            Console.WriteLine($"Received file {fileName}");
         }
     }
 }
