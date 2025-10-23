@@ -25,8 +25,16 @@ namespace Server
                 ProtocolType.Tcp
             );
 
-            IPAddress serverIp = IPAddress.Parse(settingsMgr.ReadSetting(ServerConfig.ServerIpConfigKey));
-            int serverPort = int.Parse(settingsMgr.ReadSetting(ServerConfig.SeverPortConfigKey));
+            string serverHostnameString = Environment.GetEnvironmentVariable(ServerConfig.ServerIpConfigKey) ?? "0.0.0.0";
+            string serverPortString = Environment.GetEnvironmentVariable(ServerConfig.SeverPortConfigKey) ?? "5000";
+
+            IPAddress[] addresses = Dns.GetHostAddresses(serverHostnameString);
+            IPAddress? serverIp = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
+            if (serverIp == null)
+            {
+                throw new Exception($"Cannot resolve hostname: {serverHostnameString}");
+            }
+            int serverPort = int.Parse(serverPortString);
 
             IPEndPoint serverEndpoint = new IPEndPoint(serverIp, serverPort);
 
@@ -156,7 +164,12 @@ namespace Server
         static void ReceiveFile(NetworkDataHelper networkDataHelper, byte[] fileNameData)
         {
             string fileName = Encoding.UTF8.GetString(fileNameData);
-
+            string receiveDirectory = Environment.GetEnvironmentVariable(ServerConfig.ReceivedFilesFolder) ?? "ReceivedFiles";
+            if (!Directory.Exists(receiveDirectory))
+            {
+                Directory.CreateDirectory(receiveDirectory);
+            }
+            fileName = Path.Combine(receiveDirectory, fileName);
             byte[] fileSizeBuffer = networkDataHelper.Receive(Protocol.FileLengthSize);
             long fileSize = BitConverter.ToInt64(fileSizeBuffer);
 

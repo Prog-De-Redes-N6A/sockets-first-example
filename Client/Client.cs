@@ -29,13 +29,31 @@ namespace Cliente
                 ProtocolType.Tcp
             );
 
-            IPAddress clientIp = IPAddress.Parse(settingsMgr.ReadSetting(ClientConfig.ClientIpConfigKey));
-            int clientPort = int.Parse(settingsMgr.ReadSetting(ClientConfig.ClientPortConfigKey));
+            string clientHostnameString = Environment.GetEnvironmentVariable(ClientConfig.ClientIpConfigKey) ?? "127.0.0.1";
+            Console.WriteLine($"client host: {clientHostnameString}");
+            IPAddress[] addresses = Dns.GetHostAddresses(clientHostnameString);
+            IPAddress? clientIp = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
+            if (clientIp == null)
+            {
+                throw new Exception($"Cannot resolve client hostname: {clientHostnameString}");
+            }
+            string clientPortString = Environment.GetEnvironmentVariable(ClientConfig.ClientPortConfigKey) ?? "0";
+
+            int clientPort = int.Parse(clientPortString);
             IPEndPoint localEndpoint = new IPEndPoint(clientIp, clientPort);
             clientSocket.Bind(localEndpoint);
 
-            IPAddress serverIp = IPAddress.Parse(settingsMgr.ReadSetting(ServerConfig.ServerIpConfigKey));
-            int serverPort = int.Parse(settingsMgr.ReadSetting(ServerConfig.SeverPortConfigKey));
+
+            string serverHostnameString = Environment.GetEnvironmentVariable(ServerConfig.ServerIpConfigKey) ?? "127.0.0.1";
+            IPAddress[] serverAddresses = Dns.GetHostAddresses(serverHostnameString);
+            IPAddress? serverIp = serverAddresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
+            if (serverIp == null)
+            {
+                throw new Exception($"Cannot resolve server hostname: {serverHostnameString}");
+            }
+            Console.WriteLine($"Server IP {serverIp.ToString()}");
+            string serverPortString = Environment.GetEnvironmentVariable(ServerConfig.SeverPortConfigKey) ?? "5000";
+            int serverPort = int.Parse(serverPortString);
             IPEndPoint serverEndpoint = new IPEndPoint(serverIp, serverPort);
 
             try
