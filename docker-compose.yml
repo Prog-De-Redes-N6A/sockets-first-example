@@ -1,0 +1,43 @@
+services:
+  server:
+    build:
+      dockerfile: Server/Dockerfile
+    container_name: ${SERVER_HOSTNAME:-server}
+    environment:
+      - SERVER_HOSTNAME=${SERVER_HOSTNAME:-server}
+      - SERVER_PORT=${SERVER_PORT:-5000}
+      - RECEIVE_DIRECTORY=${SERVER_RECEIVE_DIRECTORY:-ReceivedFiles}
+    volumes:
+      - ./ServerFiles:${SERVER_RECEIVE_DIRECTORY:-ReceivedFiles}
+  
+  client:
+    build:
+      dockerfile: Client/Dockerfile
+    container_name: ${CLIENT_HOSTNAME:-client}
+    environment:
+      - SERVER_HOSTNAME=${SERVER_HOSTNAME:-server}
+      - SERVER_PORT=${SERVER_PORT:-5000}
+      - CLIENT_HOSTNAME=${CLIENT_HOSTNAME:-client}
+      - CLIENT_PORT=${CLIENT_PORT:-0}
+    volumes:
+      - ./ClientFiles:${CLIENT_SHARED_FOLDER:-/app/SharedFiles}
+    depends_on:
+      - server
+    tty: true
+    stdin_open: true
+
+  client2:
+    build:
+      dockerfile: Client/Dockerfile
+    container_name: client2
+    environment:
+      - SERVER_HOSTNAME=${SERVER_HOSTNAME:-server}
+      - SERVER_PORT=${SERVER_PORT:-5000}
+      - CLIENT_HOSTNAME=client2
+      - CLIENT_PORT=${CLIENT_PORT:-0}
+    volumes:
+      - ./ClientFiles2:${CLIENT_SHARED_FOLDER:-/app/SharedFiles}
+    depends_on:
+      - server
+    tty: true
+    stdin_open: true

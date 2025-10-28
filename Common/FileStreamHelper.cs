@@ -8,7 +8,7 @@ namespace Common
 {
     public class FileStreamHelper
     {
-        public byte[] Read(string path, long offset, int length)
+        public async Task<byte[]> ReadAsync(string path, long offset, int length)
         {
             byte[] data = new byte[length];
 
@@ -18,7 +18,7 @@ namespace Common
                 int bytesRead = 0;
                 while (bytesRead < length)
                 {
-                    int read = fs.Read(data, bytesRead, length - bytesRead);
+                    int read = await fs.ReadAsync(data, bytesRead, length - bytesRead);
                     if (read == 0)
                     {
                         throw new Exception("File could not be read");
@@ -29,20 +29,20 @@ namespace Common
             return data;
         }
 
-        public void Write(string path, byte[] data)
+        public async Task WriteAsync(string path, byte[] data)
         {
             if (File.Exists(path))
             {
                 using (FileStream fs = new FileStream(path, FileMode.Append))
                 {
-                    fs.Write(data, 0, data.Length);
+                    await fs.WriteAsync(data, 0, data.Length);
                 }
             }
             else
             {
                 using (FileStream fs = new FileStream(path, FileMode.Create))
                 {
-                    fs.Write(data, 0, data.Length);
+                    await fs.WriteAsync(data, 0, data.Length);
                 }
             }
         }

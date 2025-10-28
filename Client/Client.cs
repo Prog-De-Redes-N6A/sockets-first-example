@@ -8,6 +8,7 @@ namespace Cliente
     internal class Client
     {
         static readonly SettingsManager settingsMgr = new SettingsManager();
+        static CancellationTokenSource cts = new CancellationTokenSource();
 
         static void PrintMenu()
         {
@@ -19,7 +20,7 @@ namespace Cliente
             Console.Write("Please select option: ");
         }
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine("Starting Client Application..");
 
@@ -56,9 +57,17 @@ namespace Cliente
             int serverPort = int.Parse(serverPortString);
             IPEndPoint serverEndpoint = new IPEndPoint(serverIp, serverPort);
 
+            Console.CancelKeyPress += HandleCancelKeyPress;
+
             try
             {
-                clientSocket.Connect(serverEndpoint); // Blocking
+                Task connectTask = clientSocket.ConnectAsync(serverEndpoint);
+                await connectTask.WaitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("Connect cancelled");
+                return;
             }
             catch (Exception e)
             {
@@ -66,6 +75,8 @@ namespace Cliente
                 Thread.Sleep(3000);
                 return;
             }
+
+            Console.CancelKeyPress -= HandleCancelKeyPress;
 
             Console.WriteLine("Connected to server!!");
 
@@ -97,9 +108,9 @@ namespace Cliente
 
                 try
                 {
-                    networkDataHelper.Send(messageType);
+                    await networkDataHelper.SendAsync(messageType);
 
-                    networkDataHelper.Send(commandStringDataBytes);
+                    await networkDataHelper.SendAsync(commandStringDataBytes);
                 }
                 catch (SocketException e)
                 {
@@ -110,13 +121,13 @@ namespace Cliente
                 switch (command)
                 {
                     case Command.Register:
-                        clientRunning = Register(networkDataHelper);
+                        clientRunning = await Register(networkDataHelper);
                         break;
                     case Command.LogIn:
-                        clientRunning = LogIn(networkDataHelper);
+                        clientRunning = await LogIn(networkDataHelper);
                         break;
                     case Command.SendFile:
-                        clientRunning = SendFile(networkDataHelper);
+                        clientRunning = await SendFile(networkDataHelper);
                         break;
                     default:
                         Console.WriteLine("Invalid option");
@@ -129,7 +140,7 @@ namespace Cliente
             clientSocket.Close();
         }
 
-        internal static bool Register(NetworkDataHelper networkDataHelper)
+        internal async static Task<bool> Register(NetworkDataHelper networkDataHelper)
         {
             Console.Write("Username: ");
             string? userName = Console.ReadLine();
@@ -154,10 +165,10 @@ namespace Cliente
 
             try
             {
-                networkDataHelper.Send(commandDataLength);
-                networkDataHelper.Send(commandData);
+                await networkDataHelper.SendAsync(commandDataLength);
+                await networkDataHelper.SendAsync(commandData);
 
-                byte[] result = networkDataHelper.Receive(1);
+                byte[] result = await networkDataHelper.ReceiveAsync(1);
                 bool loggedIn = BitConverter.ToBoolean(result);
 
                 if (loggedIn)
@@ -177,7 +188,7 @@ namespace Cliente
             }
         }
 
-        internal static bool LogIn(NetworkDataHelper networkDataHelper)
+        internal async static Task<bool> LogIn(NetworkDataHelper networkDataHelper)
         {
             Console.Write("Username: ");
             string? userName = Console.ReadLine();
@@ -202,10 +213,10 @@ namespace Cliente
 
             try
             {
-                networkDataHelper.Send(commandDataLength);
-                networkDataHelper.Send(commandData);
+                await networkDataHelper.SendAsync(commandDataLength);
+                await networkDataHelper.SendAsync(commandData);
 
-                byte[] result = networkDataHelper.Receive(1);
+                byte[] result = await networkDataHelper.ReceiveAsync(1);
                 bool loggedIn = BitConverter.ToBoolean(result);
 
                 if (loggedIn)
@@ -225,7 +236,7 @@ namespace Cliente
             }
         }
 
-        internal static bool SendFile(NetworkDataHelper networkDataHelper)
+        internal async static Task<bool> SendFile(NetworkDataHelper networkDataHelper)
         {
             try
             {
@@ -249,13 +260,13 @@ namespace Cliente
                 int fileNameLength = fileNameBytes.Length;
                 byte[] fileNameLengthBytes = BitConverter.GetBytes(fileNameLength);
 
-                networkDataHelper.Send(fileNameLengthBytes);
+                await networkDataHelper.SendAsync(fileNameLengthBytes);
 
-                networkDataHelper.Send(fileNameBytes);
+                await networkDataHelper.SendAsync(fileNameBytes);
 
                 long fileSize = fileInfo.Length;
                 byte[] fileSizeBytes = BitConverter.GetBytes(fileSize);
-                networkDataHelper.Send(fileSizeBytes);
+                await networkDataHelper.SendAsync(fileSizeBytes);
 
                 long offset = 0; // bytes sent
                 long partCount = Protocol.CalculateFileParts(fileSize);
@@ -271,17 +282,17 @@ namespace Cliente
                     if (!isLastPart)
                     {
                         Console.WriteLine($"Sending segment #{currentPart} of size {Protocol.MaxFilePartSize}");
-                        buffer = fsh.Read(filePath, offset, Protocol.MaxFilePartSize);
+                        buffer = await fsh.ReadAsync(filePath, offset, Protocol.MaxFilePartSize);
                         offset += Protocol.MaxFilePartSize;
                     }
                     else
                     {
                         long lastPartSize = fileSize - offset;
                         Console.WriteLine($"Sending segment #{currentPart} of size {lastPartSize}");
-                        buffer = fsh.Read(filePath, offset, (int)lastPartSize);
+                        buffer = await fsh.ReadAsync(filePath, offset, (int)lastPartSize);
                         offset += lastPartSize;
                     }
-                    networkDataHelper.Send(buffer);
+                    await networkDataHelper.SendAsync(buffer);
                     currentPart++;
                 }
 
@@ -293,6 +304,12 @@ namespace Cliente
                 Console.WriteLine("Connection interrupted");
                 return false;
             }
+        }
+
+        internal static void HandleCancelKeyPress(object? sender, ConsoleCancelEventArgs e) {
+            e.Cancel = true;
+            Console.WriteLine("Cancellation requested...");
+            cts.Cancel();
         }
     }
 }

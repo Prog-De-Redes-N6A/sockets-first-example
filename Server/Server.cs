@@ -15,7 +15,7 @@ namespace Server
         static List<User> users = new List<User>();
         static readonly object usersLock = new object();
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine("Starting Server Application..");
 
@@ -47,19 +47,21 @@ namespace Server
 
             while (currentClients < maxClientsAllowed)
             {
-                Socket clientSocket = serverSocket.Accept(); // Blocking
+                Socket clientSocket = await serverSocket.AcceptAsync();
                 lock (clientThreadsLock)
                 {
                     currentClients++;
                 }
-                int clientNum = currentClients;
-                Thread t = new Thread(() => HandleClient(clientSocket, clientNum));
-                t.Start();
+                _ = Task.Run(async () =>
+                {
+                    int clientNum = currentClients;
+                    await HandleClientAsync(clientSocket, clientNum);
+                });
             }
             serverSocket.Close();
         }
 
-        static void HandleClient(Socket clientSocket, int clientNum)
+        static async Task HandleClientAsync(Socket clientSocket, int clientNum)
         {
             bool clientActive = true;
             NetworkDataHelper networkDataHelper = new NetworkDataHelper(clientSocket);
@@ -67,26 +69,26 @@ namespace Server
             {
                 try
                 {
-                    byte[] messageType = networkDataHelper.Receive(Protocol.MessageTypeLength);
+                    byte[] messageType = await networkDataHelper.ReceiveAsync(Protocol.MessageTypeLength);
 
-                    byte[] commandStringBytes = networkDataHelper.Receive(Protocol.CommandStringLength);
+                    byte[] commandStringBytes = await networkDataHelper.ReceiveAsync(Protocol.CommandStringLength);
                     string commandString = Encoding.UTF8.GetString(commandStringBytes);
                     Command command = (Command)int.Parse(commandString);
 
-                    byte[] commandDataLength = networkDataHelper.Receive(sizeof(int));
+                    byte[] commandDataLength = await networkDataHelper.ReceiveAsync(sizeof(int));
                     int length = BitConverter.ToInt32(commandDataLength);
-                    byte[] commandData = networkDataHelper.Receive(length);
+                    byte[] commandData = await networkDataHelper.ReceiveAsync(length);
 
                     switch (command)
                     {
                         case Command.Register:
-                            Register(networkDataHelper, commandData);
+                            await Register(networkDataHelper, commandData);
                             break;
                         case Command.LogIn:
-                            LogIn(networkDataHelper, commandData);
+                            await LogIn(networkDataHelper, commandData);
                             break;
                         case Command.SendFile:
-                            ReceiveFile(networkDataHelper, commandData);
+                            await ReceiveFile(networkDataHelper, commandData);
                             break;
                         default:
                             break;
@@ -111,7 +113,7 @@ namespace Server
             }
         }
 
-        static void Register(NetworkDataHelper networkDataHelper, byte[] data)
+        static async Task Register(NetworkDataHelper networkDataHelper, byte[] data)
         {
             string dataString = Encoding.UTF8.GetString(data);
             string[] nameAndPass = dataString.Split('|');
@@ -132,10 +134,10 @@ namespace Server
 
             byte[] resultBytes = BitConverter.GetBytes(added);
 
-            networkDataHelper.Send(resultBytes);
+            await networkDataHelper.SendAsync(resultBytes);
         }
 
-        static void LogIn(NetworkDataHelper networkDataHelper, byte[] data)
+        static async Task LogIn(NetworkDataHelper networkDataHelper, byte[] data)
         {
             string dataString = Encoding.UTF8.GetString(data);
             string[] nameAndPass = dataString.Split('|');
@@ -158,10 +160,10 @@ namespace Server
 
             byte[] resultBytes = BitConverter.GetBytes(success);
 
-            networkDataHelper.Send(resultBytes);
+            await networkDataHelper.SendAsync(resultBytes);
         }
 
-        static void ReceiveFile(NetworkDataHelper networkDataHelper, byte[] fileNameData)
+        static async Task ReceiveFile(NetworkDataHelper networkDataHelper, byte[] fileNameData)
         {
             string fileName = Encoding.UTF8.GetString(fileNameData);
             string receiveDirectory = Environment.GetEnvironmentVariable(ServerConfig.ReceivedFilesFolder) ?? "ReceivedFiles";
@@ -170,7 +172,7 @@ namespace Server
                 Directory.CreateDirectory(receiveDirectory);
             }
             fileName = Path.Combine(receiveDirectory, fileName);
-            byte[] fileSizeBuffer = networkDataHelper.Receive(Protocol.FileLengthSize);
+            byte[] fileSizeBuffer = await networkDataHelper.ReceiveAsync(Protocol.FileLengthSize);
             long fileSize = BitConverter.ToInt64(fileSizeBuffer);
 
             long offset = 0; // bytes received
@@ -189,17 +191,17 @@ namespace Server
                     if (!isLastPart)
                     {
                         Console.WriteLine($"Receiving segment #{currentPart} of size {Protocol.MaxFilePartSize}");
-                        buffer = networkDataHelper.Receive(Protocol.MaxFilePartSize);
+                        buffer = await networkDataHelper.ReceiveAsync(Protocol.MaxFilePartSize);
                         offset += Protocol.MaxFilePartSize;
                     }
                     else
                     {
                         long lastPartSize = fileSize - offset;
                         Console.WriteLine($"Receiving segment #{currentPart} of size {lastPartSize}");
-                        buffer = networkDataHelper.Receive((int)lastPartSize);
+                        buffer = await networkDataHelper.ReceiveAsync((int)lastPartSize);
                         offset += lastPartSize;
                     }
-                    fsh.Write(fileName, buffer);
+                    await fsh.WriteAsync(fileName, buffer);
                     currentPart++;
                 }
                 Console.WriteLine($"Received file {fileName}");

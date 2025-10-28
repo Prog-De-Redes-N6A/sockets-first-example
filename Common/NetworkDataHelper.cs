@@ -11,14 +11,15 @@ namespace Common
             _socket = socket;
         }
 
-        public byte[] Receive(int length)
+        public async Task<byte[]> ReceiveAsync(int length)
         {
             byte[] buffer = new byte[length];
             int offset = 0;
 
             while (offset < length)
             {
-                int received = _socket.Receive(buffer, offset, length - offset, SocketFlags.None);
+                ArraySegment<byte> segment = new ArraySegment<byte>(buffer, offset, length-offset);
+                int received = await _socket.ReceiveAsync(segment, SocketFlags.None);
                 if (received == 0)
                 {
                     throw new SocketException();
@@ -29,14 +30,15 @@ namespace Common
             return buffer;
         }
 
-        public void Send(byte[] buffer)
+        public async Task SendAsync(byte[] buffer)
         {
             int length = buffer.Length;
             int offset = 0;
 
             while (offset < length)
             {
-                int sent = _socket.Send(buffer, offset, length - offset, SocketFlags.None);
+                ArraySegment<byte> segment = new ArraySegment<byte>(buffer, offset, length - offset);
+                int sent = await _socket.SendAsync(segment, SocketFlags.None);
                 if (sent == 0)
                 {
                     throw new SocketException();

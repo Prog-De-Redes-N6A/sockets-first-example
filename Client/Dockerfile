@@ -17,4 +17,4 @@ COPY Common/. ./Common
 
 RUN dotnet publish ./Client/Client.csproj -c Release -o /app/publish
 
-ENTRYPOINT ["dotnet", "/app/publish/Client.dll"]
+ENTRYPOINT ["tail", "-f", "/dev/null"]
